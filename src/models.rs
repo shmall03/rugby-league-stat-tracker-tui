@@ -21,6 +21,7 @@ pub enum Phase {
     Halftime,
     SecondHalf,
     FullTime,
+    GoldenPointExtraTime,
 }
 
 impl Phase {
@@ -30,6 +31,7 @@ impl Phase {
             Phase::Halftime => "Halftime",
             Phase::SecondHalf => "Second Half",
             Phase::FullTime => "Full Time",
+            Phase::GoldenPointExtraTime => "Golden Point ET",
         }
     }
 }
@@ -119,6 +121,7 @@ pub struct MatchState {
     pub team_a: String,
     pub team_b: String,
     pub phase: Phase,
+    pub phase_start_secs: u64,
     pub sets_completed_a: u32,
     pub sets_completed_b: u32,
     pub sets_attempted_a: u32,
@@ -137,6 +140,7 @@ impl MatchState {
             team_a,
             team_b,
             phase: Phase::FirstHalf,
+            phase_start_secs: 0,
             sets_completed_a: 0,
             sets_completed_b: 0,
             sets_attempted_a: 0,
@@ -324,12 +328,32 @@ impl MatchState {
         self.possession(team) / total * 100.0
     }
 
+    pub fn phase_elapsed(&self) -> u64 {
+        self.elapsed_secs.saturating_sub(self.phase_start_secs)
+    }
+
+    pub fn phase_duration(&self) -> u64 {
+        match self.phase {
+            Phase::FirstHalf => 2400,
+            Phase::Halftime => u64::MAX,
+            Phase::SecondHalf => 2400,
+            Phase::FullTime => u64::MAX,
+            Phase::GoldenPointExtraTime => u64::MAX,
+        }
+    }
+
+    pub fn tied(&self) -> bool {
+        self.score_a() == self.score_b()
+    }
+
     pub fn advance_phase(&mut self) {
         self.phase = match self.phase {
             Phase::FirstHalf => Phase::Halftime,
             Phase::Halftime => Phase::SecondHalf,
             Phase::SecondHalf => Phase::FullTime,
             Phase::FullTime => Phase::FullTime,
+            Phase::GoldenPointExtraTime => Phase::FullTime,
         };
+        self.phase_start_secs = self.elapsed_secs;
     }
 }

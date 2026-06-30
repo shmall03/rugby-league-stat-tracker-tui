@@ -27,6 +27,7 @@ pub struct App {
     pub message: Option<String>,
     pub message_ticks: u32,
     pub should_quit: bool,
+    pub tie_options_active: bool,
     clock_baseline: u64,
     clock_resumed_at: Option<Instant>,
     last_possession_tick: Option<Instant>,
@@ -43,6 +44,7 @@ impl App {
             message: None,
             message_ticks: 0,
             should_quit: false,
+            tie_options_active: false,
             clock_baseline: 0,
             clock_resumed_at: None,
             last_possession_tick: None,
@@ -58,6 +60,22 @@ impl App {
     fn set_message(&mut self, msg: String) {
         self.message = Some(msg);
         self.message_ticks = 0;
+    }
+
+    fn check_golden_point(&mut self) {
+        if self.state.phase == Phase::GoldenPointExtraTime && !self.state.tied() {
+            self.state.phase = Phase::FullTime;
+            self.state.clock_running = false;
+            self.state.in_possession = false;
+            self.clock_resumed_at = None;
+            self.last_possession_tick = None;
+            let winner = if self.state.score_a() > self.state.score_b() {
+                self.state.team_name(Team::A)
+            } else {
+                self.state.team_name(Team::B)
+            };
+            self.set_message(format!("{} wins! Golden point ended.", winner));
+        }
     }
 
     fn flush_possession(&mut self) {
@@ -88,6 +106,28 @@ impl App {
                 }
             }
             self.last_possession_tick = Some(now);
+
+            if self.state.phase_elapsed() >= self.state.phase_duration() {
+                self.flush_possession();
+                self.state.clock_running = false;
+                self.state.in_possession = false;
+                self.clock_resumed_at = None;
+                self.last_possession_tick = None;
+
+                if self.state.phase == Phase::SecondHalf && self.state.tied() {
+                    self.tie_options_active = true;
+                    self.set_message("Scores tied! Press E: End in tie | G: Golden point extra time".to_string());
+                } else {
+                    self.state.advance_phase();
+                    let msg = match self.state.phase {
+                        Phase::Halftime => "Half-time!".to_string(),
+                        Phase::SecondHalf => "Second half!".to_string(),
+                        Phase::FullTime => "Full-time!".to_string(),
+                        _ => format!("Phase: {}", self.state.phase.label()),
+                    };
+                    self.set_message(msg);
+                }
+            }
         }
     }
 
@@ -133,6 +173,7 @@ impl App {
                             self.save_state();
                             self.state.events.push(Event::Try(try_event));
                             self.set_message(format!("Try scored by {}! (+4 pts)", player.trim()));
+                            self.check_golden_point();
                         }
                     }
                 }
@@ -151,6 +192,7 @@ impl App {
                             };
                             self.state.events.push(Event::Conversion(event));
                             self.set_message(format!("Conversion by {}! (+2 pts)", kicker.trim()));
+                            self.check_golden_point();
                         }
                     }
                 }
@@ -168,6 +210,7 @@ impl App {
                             };
                             self.state.events.push(Event::PenaltyGoal(event));
                             self.set_message(format!("Penalty goal by {}! (+2 pts)", kicker.trim()));
+                            self.check_golden_point();
                         }
                     }
                 }
@@ -185,6 +228,7 @@ impl App {
                             };
                             self.state.events.push(Event::DropGoal(event));
                             self.set_message(format!("Drop goal by {}! (+1 pt)", player.trim()));
+                            self.check_golden_point();
                         }
                     }
                 }
@@ -239,6 +283,30 @@ impl App {
                 let submitted = result.is_some();
                 let target = self.input_target;
                 self.handle_input_target(target, submitted, result);
+            }
+            return;
+        }
+
+        if self.tie_options_active {
+            match key.code {
+                KeyCode::Char('E') => {
+                    self.tie_options_active = false;
+                    self.state.phase = Phase::FullTime;
+                    self.state.clock_running = false;
+                    self.state.in_possession = false;
+                    self.clock_resumed_at = None;
+                    self.last_possession_tick = None;
+                    self.set_message("Match ends in a tie.".to_string());
+                }
+                KeyCode::Char('G') => {
+                    self.tie_options_active = false;
+                    self.state.phase = Phase::GoldenPointExtraTime;
+                    self.state.phase_start_secs = self.state.elapsed_secs;
+                    self.set_message("Golden point — first score wins! Press Space to start.".to_string());
+                }
+                _ => {
+                    self.set_message("Press E: End in tie | G: Golden point extra time".to_string());
+                }
             }
             return;
         }

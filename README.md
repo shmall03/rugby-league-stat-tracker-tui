@@ -10,12 +10,13 @@ A terminal-based (TUI) rugby league match statistics tracker built with Rust. Re
 - **Possession tracking** — Live % per team, toggle with `i`, visual `● IN POSSESSION` indicator
 - **Set completion** — Track completed vs attempted sets with percentage
 - **Discipline** — Yellow and red cards per player
-- **Match phases** — First Half → Halftime → Second Half → Full Time
+- **Match phases** — Auto-advance at 40′ and 80′; untimed Halftime (manual `s`); ties prompt End/Golden Point
 - **Auto-minute** — Event minute auto-populated from the clock (minute 1 at 00:14, etc.)
 - **Team toggle** — Switch active team with `Tab`; stats apply to the active team
 - **Undo** — Revert the last action with `u` (covers tackles too)
 - **Export** — Save match data to JSON (auto-save on quit, manual save with `o`)
 - **Colour-coded UI** — Each team gets its own colour; active team highlighted
+- **Tie resolution** — Tied at full time? End in a tie (`E`) or play Golden Point extra time (`G`); first score wins
 
 ## Installation
 
@@ -48,9 +49,11 @@ Enter team names at startup, then use the keyboard to track the match:
 | `i` | Toggle possession |
 | `y` | Yellow card — enter player name |
 | `R` | Red card — enter player name |
-| `s` | Advance match phase (First Half → Halftime → Second Half → Full Time) |
+| `s` | Advances stage of the game: First Half → Halftime → Second Half → Full Time / Golden Point ET |
 | `u` | Undo last action |
 | `o` | Save match to JSON |
+| `E` | End match in a tie (when prompted at full time) |
+| `G` | Golden Point extra time (when prompted) |
 | `q` | Quit (auto-saves if teams have data) |
 
 All event minute fields are auto-populated from the match clock — no manual entry required.
