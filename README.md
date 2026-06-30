@@ -1,6 +1,6 @@
 # Rugby League Stat Tracker TUI
 
-A terminal-based (TUI) rugby league match statistics tracker built with Rust. Record scores, tackles, errors, set completion, discipline, and more — all from the comfort of your terminal.
+A terminal-based (TUI) rugby league match statistics tracker built with Rust. Record scores, tackles, errors, set completion, discipline, and more. Any suggestions are welcome.
 
 ## Features
 
@@ -12,7 +12,7 @@ A terminal-based (TUI) rugby league match statistics tracker built with Rust. Re
 - **Team toggle** — Switch active team with `Space`; stats apply to the active team
 - **Undo** — Revert the last action with `u`
 - **Export** — Save match data to JSON (auto-save on quit, manual save with `o`)
-- **Color-coded UI** — Each team gets its own color; active team highlighted
+- **Colour-coded UI** — Each team gets its own colour; active team highlighted
 
 ## Installation
 
@@ -30,23 +30,25 @@ Enter team names at startup, then use the keyboard to track the match:
 
 | Key | Action |
 |-----|--------|
-| `Space` | Toggle active team |
-| `t` | Tackle (against defending team) |
+| `Space` | Toggle team currently in possession |
+| `t` | Tackle (against attacking team) |
 | `r` | Try — enter minute then scorer name |
 | `c` | Conversion — enter minute then kicker name |
 | `g` | Penalty goal — enter minute then kicker name |
-| `d` | Drop goal — enter minute then scorer name |
-| `n` | Set NOT completed (attacking team) |
-| `m` | Set completed (attacking team) |
-| `x` | Six again (defending team) |
-| `e` | Error / knock-on (attacking team) |
+| `d` | Drop goal — enter minute then kicker name |
+| `n` | Set NOT completed (by attacking team) |
+| `m` | Set completed (by attacking team) |
+| `x` | Six again (for attacking team) |
+| `e` | Error / knock-on (by attacking team) |
 | `p` | Penalty awarded (against defending team) |
 | `y` | Yellow card — enter minute then player name |
-| `R` | Red card — enter minute then player name |
-| `s` | Advance match phase |
+| `R` `(SHIFT + r)` | Red card — enter minute then player name |
+| `s` | Advance match phase (First Half -> Half-time -> Second Half -> Match Finished)* |
 | `u` | Undo last action |
 | `o` | Save match to JSON |
 | `q` | Quit (auto-saves if teams have data) |
+
+(*) Matches that go into extra time and/or golden point are not currently supported but can be tracked by simply continuing the second half.
 
 ## Export
 
