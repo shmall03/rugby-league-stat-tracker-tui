@@ -96,6 +96,12 @@ pub struct DropGoalEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TackleEvent {
+    pub team: Team,
+    pub minute: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
     Try(TryEvent),
     Conversion(ConversionEvent),
@@ -105,6 +111,7 @@ pub enum Event {
     SixAgain(SixAgainEvent),
     Error(ErrorEvent),
     DropGoal(DropGoalEvent),
+    Tackle(TackleEvent),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,12 +119,15 @@ pub struct MatchState {
     pub team_a: String,
     pub team_b: String,
     pub phase: Phase,
-    pub tackles_a: u32,
-    pub tackles_b: u32,
     pub sets_completed_a: u32,
     pub sets_completed_b: u32,
     pub sets_attempted_a: u32,
     pub sets_attempted_b: u32,
+    pub elapsed_secs: u64,
+    pub clock_running: bool,
+    pub possession_secs_a: f64,
+    pub possession_secs_b: f64,
+    pub in_possession: bool,
     pub events: Vec<Event>,
 }
 
@@ -127,12 +137,15 @@ impl MatchState {
             team_a,
             team_b,
             phase: Phase::FirstHalf,
-            tackles_a: 0,
-            tackles_b: 0,
             sets_completed_a: 0,
             sets_completed_b: 0,
             sets_attempted_a: 0,
             sets_attempted_b: 0,
+            elapsed_secs: 0,
+            clock_running: false,
+            possession_secs_a: 0.0,
+            possession_secs_b: 0.0,
+            in_possession: false,
             events: Vec::new(),
         }
     }
@@ -173,11 +186,15 @@ impl MatchState {
         }
     }
 
+    pub fn active_minute(&self) -> u32 {
+        (self.elapsed_secs / 60) as u32 + 1
+    }
+
     pub fn tackles(&self, team: Team) -> u32 {
-        match team {
-            Team::A => self.tackles_a,
-            Team::B => self.tackles_b,
-        }
+        self.events
+            .iter()
+            .filter(|e| matches!(e, Event::Tackle(t) if t.team == team))
+            .count() as u32
     }
 
     pub fn sets_completed(&self, team: Team) -> u32 {
@@ -283,6 +300,28 @@ impl MatchState {
                 Event::Try(t) if t.team == team => Some(i),
                 _ => None,
             })
+    }
+
+    pub fn possession(&self, team: Team) -> f64 {
+        match team {
+            Team::A => self.possession_secs_a,
+            Team::B => self.possession_secs_b,
+        }
+    }
+
+    pub fn possession_secs_mut(&mut self, team: Team) -> &mut f64 {
+        match team {
+            Team::A => &mut self.possession_secs_a,
+            Team::B => &mut self.possession_secs_b,
+        }
+    }
+
+    pub fn possession_pct(&self, team: Team) -> f64 {
+        let total = self.possession_secs_a + self.possession_secs_b;
+        if total == 0.0 {
+            return 0.0;
+        }
+        self.possession(team) / total * 100.0
     }
 
     pub fn advance_phase(&mut self) {

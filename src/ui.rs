@@ -25,6 +25,11 @@ fn truncate(s: &str, max: usize) -> String {
 }
 
 fn render_header(f: &mut Frame, area: Rect, app: &App) {
+    let mins = app.state.elapsed_secs / 60;
+    let secs = app.state.elapsed_secs % 60;
+    let clock_indicator = if app.state.clock_running { "▶" } else { "⏸" };
+    let clock_color = if app.state.clock_running { Color::Green } else { Color::Red };
+
     let text = Text::from(vec![
         Line::from(vec![Span::raw("")]),
         Line::from(vec![
@@ -50,6 +55,11 @@ fn render_header(f: &mut Frame, area: Rect, app: &App) {
             ),
             Span::raw("   "),
             Span::styled(app.state.phase.label(), Style::default().fg(Color::DarkGray)),
+            Span::raw("  "),
+            Span::styled(
+                format!("{} {:02}:{:02}", clock_indicator, mins, secs),
+                Style::default().fg(clock_color).add_modifier(Modifier::BOLD),
+            ),
         ]),
     ]);
 
@@ -65,6 +75,24 @@ fn render_team_panel(f: &mut Frame, area: Rect, app: &App, team: Team) {
     let is_active = team == app.active_team;
 
     lines.push(Line::from(""));
+
+    let poss = app.state.possession_pct(team);
+    let poss_color = if poss >= 55.0 {
+        team_color(team)
+    } else if poss >= 45.0 {
+        Color::Yellow
+    } else {
+        Color::Red
+    };
+    lines.push(Line::from(vec![
+        Span::raw("Possession:         "),
+        Span::styled(
+            format!("{:.0}%", poss),
+            Style::default()
+                .fg(poss_color)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]));
 
     let tkl = app.state.tackles(team);
     lines.push(Line::from(vec![
@@ -287,9 +315,15 @@ fn render_team_panel(f: &mut Frame, area: Rect, app: &App, team: Team) {
     let title_prefix = if is_active { "▸ " } else { "  " };
     let title_color = if is_active { Color::Yellow } else { Color::DarkGray };
 
+    let title_name = if is_active && app.state.in_possession {
+        format!("{}  ● IN POSSESSION ", truncate(app.state.team_name(team), 14))
+    } else {
+        truncate(app.state.team_name(team), 18)
+    };
+
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" {} {} ", title_prefix, truncate(app.state.team_name(team), 18)))
+        .title(format!(" {} {} ", title_prefix, title_name))
         .title_style(Style::default().fg(title_color).add_modifier(Modifier::BOLD))
         .border_style(Style::default().fg(if is_active { Color::Yellow } else { Color::DarkGray }));
 
@@ -315,7 +349,9 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
         let text = Text::from(vec![
             Line::from(vec![
                 Span::styled("SPACE", Style::default().fg(Color::Yellow)),
-                Span::raw(": Toggle Team    "),
+                Span::raw(": Clock    "),
+                Span::styled("TAB", Style::default().fg(Color::Yellow)),
+                Span::raw(": Team    "),
                 Span::styled("t", Style::default().fg(Color::Yellow)),
                 Span::raw(": Tackle    "),
                 Span::styled("r", Style::default().fg(Color::Yellow)),
@@ -337,7 +373,9 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
                 Span::styled("e", Style::default().fg(Color::Yellow)),
                 Span::raw(": Error    "),
                 Span::styled("p", Style::default().fg(Color::Yellow)),
-                Span::raw(": Penalty (to current team)    "),
+                Span::raw(": Penalty    "),
+                Span::styled("i", Style::default().fg(Color::Yellow)),
+                Span::raw(": Possess    "),
                 Span::styled("y", Style::default().fg(Color::Yellow)),
                 Span::raw(": Yellow Card    "),
                 Span::styled("R", Style::default().fg(Color::Yellow)),

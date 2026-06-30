@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::input::TextInput;
@@ -8,17 +10,11 @@ pub enum InputTarget {
     None,
     SetupTeamA,
     SetupTeamB,
-    TryMinute,
     TryScorer,
-    ConversionMinute,
     ConversionKicker,
-    PenaltyGoalMinute,
     PenaltyGoalKicker,
-    DropGoalMinute,
     DropGoalScorer,
-    YellowCardMinute,
     YellowCardPlayer,
-    RedCardMinute,
     RedCardPlayer,
 }
 
@@ -27,11 +23,13 @@ pub struct App {
     pub undo_stack: Vec<MatchState>,
     pub input: TextInput,
     pub input_target: InputTarget,
-    pub pending_minute: Option<u32>,
     pub active_team: Team,
     pub message: Option<String>,
     pub message_ticks: u32,
     pub should_quit: bool,
+    clock_baseline: u64,
+    clock_resumed_at: Option<Instant>,
+    last_possession_tick: Option<Instant>,
 }
 
 impl App {
@@ -41,11 +39,13 @@ impl App {
             undo_stack: Vec::new(),
             input: TextInput::new(),
             input_target: InputTarget::SetupTeamA,
-            pending_minute: None,
             active_team: Team::A,
             message: None,
             message_ticks: 0,
             should_quit: false,
+            clock_baseline: 0,
+            clock_resumed_at: None,
+            last_possession_tick: None,
         };
         app.input.start("Enter Team A name: ");
         app
@@ -60,6 +60,13 @@ impl App {
         self.message_ticks = 0;
     }
 
+    fn flush_possession(&mut self) {
+        if let Some(last) = self.last_possession_tick {
+            let delta = Instant::now().duration_since(last).as_secs_f64();
+            *self.state.possession_secs_mut(self.active_team) += delta;
+        }
+    }
+
     pub fn tick(&mut self, _delta: f64) {
         if self.message.is_some() {
             self.message_ticks += 1;
@@ -67,9 +74,25 @@ impl App {
                 self.message = None;
             }
         }
+
+        if self.state.clock_running {
+            if let Some(resumed) = self.clock_resumed_at {
+                self.state.elapsed_secs = self.clock_baseline + resumed.elapsed().as_secs();
+            }
+
+            let now = Instant::now();
+            if let Some(last) = self.last_possession_tick {
+                if self.state.in_possession {
+                    let delta = now.duration_since(last).as_secs_f64();
+                    *self.state.possession_secs_mut(self.active_team) += delta;
+                }
+            }
+            self.last_possession_tick = Some(now);
+        }
     }
 
     pub fn handle_input_target(&mut self, target: InputTarget, submitted: bool, value: Option<String>) {
+        let minute = self.state.active_minute();
         match target {
             InputTarget::SetupTeamA => {
                 if submitted {
@@ -90,32 +113,18 @@ impl App {
                         if !name.trim().is_empty() {
                             self.state.team_b = name.trim().to_string();
                             self.input_target = InputTarget::None;
-                            self.set_message("Match ready! Press Space to switch active team.".to_string());
+                            self.set_message("Match ready! Press Space for clock, Tab to switch team.".to_string());
                             return;
                         }
                     }
                 }
                 self.input.start("Enter Team B name: ");
             }
-            InputTarget::TryMinute => {
-                if submitted {
-                    if let Some(m) = value {
-                        if let Ok(minute) = m.trim().parse::<u32>() {
-                            self.pending_minute = Some(minute);
-                            self.input_target = InputTarget::TryScorer;
-                            self.input.start("Try scorer name: ");
-                            return;
-                        }
-                    }
-                }
-                self.input.start("Minute? ");
-            }
             InputTarget::TryScorer => {
                 if submitted {
                     if let Some(player) = value {
                         if !player.trim().is_empty() {
                             let team = self.active_team;
-                            let minute = self.pending_minute.take().unwrap_or(0);
                             let try_event = TryEvent {
                                 team,
                                 player: player.trim().to_string(),
@@ -128,25 +137,11 @@ impl App {
                     }
                 }
             }
-            InputTarget::ConversionMinute => {
-                if submitted {
-                    if let Some(m) = value {
-                        if let Ok(minute) = m.trim().parse::<u32>() {
-                            self.pending_minute = Some(minute);
-                            self.input_target = InputTarget::ConversionKicker;
-                            self.input.start("Conversion kicker name: ");
-                            return;
-                        }
-                    }
-                }
-                self.input.start("Minute? ");
-            }
             InputTarget::ConversionKicker => {
                 if submitted {
                     if let Some(kicker) = value {
                         if !kicker.trim().is_empty() {
                             let team = self.active_team;
-                            let minute = self.pending_minute.take().unwrap_or(0);
                             self.save_state();
                             let event = ConversionEvent {
                                 team,
@@ -160,25 +155,11 @@ impl App {
                     }
                 }
             }
-            InputTarget::PenaltyGoalMinute => {
-                if submitted {
-                    if let Some(m) = value {
-                        if let Ok(minute) = m.trim().parse::<u32>() {
-                            self.pending_minute = Some(minute);
-                            self.input_target = InputTarget::PenaltyGoalKicker;
-                            self.input.start("Penalty goal kicker name: ");
-                            return;
-                        }
-                    }
-                }
-                self.input.start("Minute? ");
-            }
             InputTarget::PenaltyGoalKicker => {
                 if submitted {
                     if let Some(kicker) = value {
                         if !kicker.trim().is_empty() {
                             let team = self.active_team;
-                            let minute = self.pending_minute.take().unwrap_or(0);
                             self.save_state();
                             let event = PenaltyGoalEvent {
                                 team,
@@ -191,25 +172,11 @@ impl App {
                     }
                 }
             }
-            InputTarget::DropGoalMinute => {
-                if submitted {
-                    if let Some(m) = value {
-                        if let Ok(minute) = m.trim().parse::<u32>() {
-                            self.pending_minute = Some(minute);
-                            self.input_target = InputTarget::DropGoalScorer;
-                            self.input.start("Drop goal scorer name: ");
-                            return;
-                        }
-                    }
-                }
-                self.input.start("Minute? ");
-            }
             InputTarget::DropGoalScorer => {
                 if submitted {
                     if let Some(player) = value {
                         if !player.trim().is_empty() {
                             let team = self.active_team;
-                            let minute = self.pending_minute.take().unwrap_or(0);
                             self.save_state();
                             let event = DropGoalEvent {
                                 team,
@@ -222,25 +189,11 @@ impl App {
                     }
                 }
             }
-            InputTarget::YellowCardMinute => {
-                if submitted {
-                    if let Some(m) = value {
-                        if let Ok(minute) = m.trim().parse::<u32>() {
-                            self.pending_minute = Some(minute);
-                            self.input_target = InputTarget::YellowCardPlayer;
-                            self.input.start("Yellow card - player name: ");
-                            return;
-                        }
-                    }
-                }
-                self.input.start("Minute? ");
-            }
             InputTarget::YellowCardPlayer => {
                 if submitted {
                     if let Some(player) = value {
                         if !player.trim().is_empty() {
                             let team = self.active_team;
-                            let minute = self.pending_minute.take().unwrap_or(0);
                             let card_event = CardEvent {
                                 team,
                                 player: player.trim().to_string(),
@@ -254,25 +207,11 @@ impl App {
                     }
                 }
             }
-            InputTarget::RedCardMinute => {
-                if submitted {
-                    if let Some(m) = value {
-                        if let Ok(minute) = m.trim().parse::<u32>() {
-                            self.pending_minute = Some(minute);
-                            self.input_target = InputTarget::RedCardPlayer;
-                            self.input.start("Red card - player name: ");
-                            return;
-                        }
-                    }
-                }
-                self.input.start("Minute? ");
-            }
             InputTarget::RedCardPlayer => {
                 if submitted {
                     if let Some(player) = value {
                         if !player.trim().is_empty() {
                             let team = self.active_team;
-                            let minute = self.pending_minute.take().unwrap_or(0);
                             let card_event = CardEvent {
                                 team,
                                 player: player.trim().to_string(),
@@ -294,11 +233,6 @@ impl App {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
-        if key.code == KeyCode::Tab && self.input.active && !matches!(self.input_target, InputTarget::SetupTeamA | InputTarget::SetupTeamB) {
-            self.set_message("No clock to pause — press Space to switch team.".to_string());
-            return;
-        }
-
         if self.input.active {
             let result = self.input.handle_key(key);
             if !self.input.active {
@@ -315,31 +249,45 @@ impl App {
             }
             KeyCode::Char(' ') | KeyCode::Tab if self.input_target != InputTarget::None => {}
             KeyCode::Tab => {
-                self.set_message("No clock to pause — press Space to switch team.".to_string());
+                self.flush_possession();
+                self.active_team = self.active_team.other();
+                self.last_possession_tick = Some(Instant::now());
+                self.set_message(format!("Active team: {}", self.state.team_name(self.active_team)));
             }
             KeyCode::Char(' ') => {
-                self.active_team = self.active_team.other();
-                self.set_message(format!("Active team: {}", self.state.team_name(self.active_team)));
+                if self.state.clock_running {
+                    self.flush_possession();
+                    self.state.clock_running = false;
+                    self.clock_resumed_at = None;
+                    self.last_possession_tick = None;
+                    self.set_message("Clock paused".to_string());
+                } else {
+                    self.clock_baseline = self.state.elapsed_secs;
+                    self.clock_resumed_at = Some(Instant::now());
+                    self.state.clock_running = true;
+                    self.last_possession_tick = Some(Instant::now());
+                    self.set_message("Clock running".to_string());
+                }
             }
             KeyCode::Char('t') | KeyCode::Char('T') => {
                 let defending = self.active_team.other();
+                let minute = self.state.active_minute();
                 self.save_state();
-                match defending {
-                    Team::A => self.state.tackles_a += 1,
-                    Team::B => self.state.tackles_b += 1,
-                }
+                self.state.events.push(Event::Tackle(TackleEvent { team: defending, minute }));
                 self.set_message(format!("Tackle: {}", self.state.team_name(defending)));
             }
             KeyCode::Char('e') | KeyCode::Char('E') => {
+                let minute = self.state.active_minute();
                 self.save_state();
-                let event = ErrorEvent { team: self.active_team, minute: 0 };
+                let event = ErrorEvent { team: self.active_team, minute };
                 self.state.events.push(Event::Error(event));
                 self.set_message(format!("Error (knock-on): {}", self.state.team_name(self.active_team)));
             }
             KeyCode::Char('x') | KeyCode::Char('X') => {
                 let defending = self.active_team.other();
+                let minute = self.state.active_minute();
                 self.save_state();
-                let event = SixAgainEvent { team: defending, minute: 0 };
+                let event = SixAgainEvent { team: defending, minute };
                 self.state.events.push(Event::SixAgain(event));
                 self.set_message(format!("Six again: {}", self.state.team_name(defending)));
             }
@@ -366,39 +314,54 @@ impl App {
                 self.set_message(format!("Set completed: {}", self.state.team_name(self.active_team)));
             }
             KeyCode::Char('r') => {
-                self.input_target = InputTarget::TryMinute;
-                self.input.start("Minute? ");
+                self.input_target = InputTarget::TryScorer;
+                self.input.start("Try scorer name: ");
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
                 if self.state.recent_try(self.active_team).is_some() {
-                    self.input_target = InputTarget::ConversionMinute;
-                    self.input.start("Minute? ");
+                    self.input_target = InputTarget::ConversionKicker;
+                    self.input.start("Conversion kicker name: ");
                 } else {
                     self.set_message("No try to convert".to_string());
                 }
             }
             KeyCode::Char('d') | KeyCode::Char('D') => {
-                self.input_target = InputTarget::DropGoalMinute;
-                self.input.start("Minute? ");
+                self.input_target = InputTarget::DropGoalScorer;
+                self.input.start("Drop goal scorer name: ");
             }
             KeyCode::Char('p') | KeyCode::Char('P') => {
                 let defending = self.active_team.other();
+                let minute = self.state.active_minute();
                 self.save_state();
-                let event = PenaltyAwardedEvent { team: defending, minute: 0 };
+                let event = PenaltyAwardedEvent { team: defending, minute };
                 self.state.events.push(Event::PenaltyAwarded(event));
                 self.set_message(format!("Penalty awarded against: {}", self.state.team_name(defending)));
             }
             KeyCode::Char('g') | KeyCode::Char('G') => {
-                self.input_target = InputTarget::PenaltyGoalMinute;
-                self.input.start("Minute? ");
+                self.input_target = InputTarget::PenaltyGoalKicker;
+                self.input.start("Penalty goal kicker name: ");
+            }
+            KeyCode::Char('i') | KeyCode::Char('I') => {
+                if self.state.clock_running {
+                    self.state.in_possession = !self.state.in_possession;
+                    if self.state.in_possession {
+                        self.last_possession_tick = Some(Instant::now());
+                        self.set_message("In possession: yes".to_string());
+                    } else {
+                        self.flush_possession();
+                        self.set_message("In possession: no".to_string());
+                    }
+                } else {
+                    self.set_message("Start the clock first".to_string());
+                }
             }
             KeyCode::Char('y') => {
-                self.input_target = InputTarget::YellowCardMinute;
-                self.input.start("Minute? ");
+                self.input_target = InputTarget::YellowCardPlayer;
+                self.input.start("Yellow card - player name: ");
             }
             KeyCode::Char('R') => {
-                self.input_target = InputTarget::RedCardMinute;
-                self.input.start("Minute? ");
+                self.input_target = InputTarget::RedCardPlayer;
+                self.input.start("Red card - player name: ");
             }
             KeyCode::Char('s') | KeyCode::Char('S') => {
                 self.save_state();
