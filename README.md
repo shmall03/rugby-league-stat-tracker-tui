@@ -1,26 +1,30 @@
-# Rugby League Stat Tracker TUI
+# 🏉 Rugby League Stat Tracker TUI
 
-A terminal-based (TUI) rugby league match statistics tracker built with Rust. Record scores, tackles, errors, set completion, discipline, possession, and more. Any suggestions are welcome.
+[![Rust](https://img.shields.io/badge/Rust-1.85+-de5842?logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![ratatui](https://img.shields.io/badge/built%20with-ratatui-FFD700)](https://github.com/ratatui-org/ratatui)
 
-## Features
+A terminal-based rugby league match statistics tracker built with Rust. Record scores, tackles, errors, set completion, discipline, possession, and more. 🏟️
 
-- **Live match clock** — Start/pause with `Space`, displayed in the header
-- **Score tracking** — Tries (4pts), conversions (2pts), penalty goals (2pts), drop goals (1pt)
-- **Live stats** — Tackles, errors (knock-ons), six-again calls, penalties awarded
-- **Possession tracking** — Live % per team, toggle with `i`, visual `● IN POSSESSION` indicator
-- **Set completion** — Track completed vs attempted sets with percentage
-- **Discipline** — Yellow and red cards per player
-- **Match phases** — Auto-advance at 40′ and 80′; untimed Halftime (manual `s`); ties prompt End/Golden Point
-- **Auto-minute** — Event minute auto-populated from the clock (minute 1 at 00:14, etc.)
-- **Team toggle** — Switch active team with `Tab`; stats apply to the active team
-- **Undo** — Revert the last action with `u` (covers tackles too)
-- **Export** — Save match data to JSON (auto-save on quit, manual save with `o`)
-- **Colour-coded UI** — Each team gets its own colour; active team highlighted
-- **Tie resolution** — Tied at full time? End in a tie (`E`) or play Golden Point extra time (`G`); first score wins
+## ✨ Features
 
-![Example screenshot](example.png)
+- ⏱️ **Live match clock** — Start/pause with `Space`, displayed in the header
+- 🎯 **Score tracking** — Tries 4pts, conversions 2pts, penalty goals 2pts, drop goals 1pt
+- 📊 **Live stats** — Tackles, errors (knock-ons), six-again calls, penalties awarded
+- 🔄 **Possession tracking** — Live % per team, toggle with `i`, visual indicator
+- ✅ **Set completion** — Completed vs attempted sets with percentage
+- 🟡🔴 **Discipline** — Yellow and red cards per player
+- 🏁 **Match phases** — Auto-advance at 40′ and 80′; ties prompt End/Golden Point
+- 🕐 **Auto-minute** — Event minute auto-populated from the clock
+- 🔀 **Team toggle** — Switch active team with `Tab`
+- ↩️ **Undo** — Revert the last action with `u`
+- 💾 **Export** — Save match data to JSON (auto-save on quit, manual save with `o`)
+- 🎨 **Colour-coded UI** — Each team gets its own colour; active team highlighted
+- ⚖️ **Tie resolution** — End in a tie or play Golden Point extra time; first score wins
 
-## Installation
+![Example screenshot](https://raw.githubusercontent.com/shmall03/rugby-league-stat-tracker-tui/master/example.png)
+
+## 📦 Installation
 
 ```bash
 # Build the release binary
@@ -30,7 +34,7 @@ cargo build --release
 cargo run --release
 ```
 
-## Usage
+## 🎮 Usage
 
 Enter team names at startup, then use the keyboard to track the match:
 
@@ -60,11 +64,11 @@ Enter team names at startup, then use the keyboard to track the match:
 
 All event minute fields are auto-populated from the match clock — no manual entry required.
 
-## Export
+## 📤 Export
 
 Matches are saved as `match_{team_a}_v_{team_b}_{timestamp}.json` in the current directory. The JSON captures the full match state including all events, scores, per-team stats, and possession data.
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 src/
@@ -76,6 +80,6 @@ src/
 └── export.rs    — JSON export
 ```
 
-## License
+## ⚖️ License
 
 Licensed under the [MIT License](LICENSE).
