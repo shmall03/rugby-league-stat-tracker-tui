@@ -18,6 +18,8 @@ A terminal-based (TUI) rugby league match statistics tracker built with Rust. Re
 - **Colour-coded UI** — Each team gets its own colour; active team highlighted
 - **Tie resolution** — Tied at full time? End in a tie (`E`) or play Golden Point extra time (`G`); first score wins
 
+![Example screenshot](example.png)
+
 ## Installation
 
 ```bash
